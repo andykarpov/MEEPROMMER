@@ -7,6 +7,7 @@ package SimpleJBurn;
 import gnu.io.CommPortIdentifier;
 import java.awt.Color;
 import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -27,6 +28,7 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 import javax.swing.text.StyledDocument;
+import javax.swing.UIManager;
 
 /**
  *
@@ -34,35 +36,42 @@ import javax.swing.text.StyledDocument;
  */
 public class MainFrame extends javax.swing.JFrame implements PropertyChangeListener {
 
-    static private final String revision = "$Revision: 1.5 $";
-    static private final String date = "$Date: 2013/07/19 05:44:46 $";
+    static private final String revision = "$Revision: 1.6 $";
+    static private final String date = "$Date: 2013/07/31 13:00:00 $";
     //used to end a line in the output window
     static private final String newline = "\n";
-    private static final String[] EEPROMTYPES = {"28C64  (8k) ", "28C128 (16k)", "28C256 (32k)"};
-    private static final String[] OFFSETS = {"---", " 1k", " 2k", " 3k", " 4k", " 5k", " 6k",
-        " 7k", " 8k", " 9k", "10k", "11k", "12k", "13k", "14k", "15k", "16k", "17k",
-        "18k", "19k", "20k", "21k", "22k", "23k", "24k", "25k", "26k", "27k",
-        "28k", "29k", "30k", "31k"};
+    private static final String[] EEPROMTYPES = {"28C64  (8KiB) ", "28C128 (16KiB)", "28C256 (32KiB)", "27SF512 (64KiB)"};
+    private static final String[] OFFSETS = {"-----", " 2KiB", " 4KiB", " 8KiB", "16KiB", "24KiB", "32KiB", "48KiB"};
     private ReadTask readTask;
     private WriteTask writeTask;
     MySerial mySerial = new MySerial();
     String selectedComPort;
-    byte[] data = new byte[32768];
-    byte[] eeprom = new byte[32768];
+    byte[] data = new byte[65536];
+    byte[] eeprom = new byte[65536];
     int maxAddress = 8192;
+    int chipType = 0;
     int offset = 0;
     long filesize = 0;
-    int readwrite = 0;
+    int sequenceCtr = 0;
+    boolean failure = false;
+    
+    enum Action {
+        DIFF, READ, BLANK
+    };
 
     class ReadTask extends SwingWorker<Void, Void> {
 
         public int done = 0;
-        boolean diff = false;
         long start, end = 0;
         int readProgress = 0;
+        
+        Action action;
 
-        public ReadTask(boolean d) {
-            this.diff = d;
+        public ReadTask(Action a) {
+            this.action = a;
+            statusLabel.setText("");
+            progressBar.setValue(0);
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         }
 
         /*
@@ -72,7 +81,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         public Void doInBackground() {
             //check if eeprom should be read or written
             try {
-            try {
+                failure = false;
                 //remove old data from input stream to prevent them "poisening" our
                 //data
                 mySerial.in.skip(mySerial.in.available());
@@ -81,16 +90,16 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(mySerial.out));
                 String line = "";
 
-
-                log.insertString(log.getLength(), "sending command." + newline,null);
+                appendToLog("sending command." + newline);
                 bw.write("r,0000," + Utility.wordToHex(maxAddress) + ",20" + newline);
                 bw.flush();
-                log.insertString(log.getLength(), "command sent." + newline,null);
-                log.insertString(log.getLength(), "trying to read." + newline,null);
-                int counter = 0;
-                byte c = ' ';
+                appendToLog("command sent." + newline);
+                appendToLog("trying to read." + newline);
+                int counter = 0, c;
                 do {
-                    eeprom[counter++] = (byte) mySerial.in.read();
+                    c = mySerial.in.read();
+                    if (c == -1) throw new Exception("Communication timeout");
+                    eeprom[counter++] = (byte) c;
                     if (counter % 100 == 0) {
                         readProgress = 100 * counter / maxAddress;
                         setProgress(readProgress);
@@ -101,13 +110,9 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
 
 
             } catch (Exception e) {
-                log.insertString(log.getLength(), "Error: " + e.getMessage() + newline,null);
+                appendToLog("Error: " + e.getMessage() + newline);
+                failure = true;
             }
-        } catch (BadLocationException e) {
-            System.err.println("Output Error");
-        }
-
-
 
             /**
              * Random random = new Random(); int progress = 0; int steps = 100 /
@@ -126,18 +131,16 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
          */
         @Override
         public void done() {
-            try{ 
-                Toolkit.getDefaultToolkit().beep();
-            clearButton.setEnabled(true);
-            writeButton.setEnabled(true);
+            Toolkit.getDefaultToolkit().beep();
+            verifyButton.setEnabled(true);
+            blankButton.setEnabled(true);
             readButton.setEnabled(true);
             setCursor(null); //turn off the wait cursor
-            log.insertString(log.getLength(), maxAddress + " bytes read in " + (float) (end - start) / 1000
-                    + " seconds " + newline,null);
-            textPane.setCaretPosition(textPane.getDocument().getLength());
-            if (this.diff) {
-                log.insertString(log.getLength(), "Checking difference between loaded ROM file and data on EEPROM"
-                        + newline,null);
+            appendToLog(maxAddress + " bytes read in " + (float) (end - start) / 1000
+                    + " seconds " + newline);
+            if (this.action == Action.DIFF) {
+                appendToLog("Checking difference between loaded ROM file and data on EEPROM"
+                        + newline);
                 int byteCount = 0;
                 //this.readEEPROM();
                 for (int i = 0; i < filesize; i++) {
@@ -145,14 +148,29 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
                         byteCount++;
                     }
                 }
-                log.insertString(log.getLength(), filesize + " bytes checked from 0x" + Utility.wordToHex(offset)
+                appendToLog(filesize + " bytes checked from 0x" + Utility.wordToHex(offset)
                         + " to 0x" + Utility.wordToHex(offset + (int) filesize - 1) + ", " + byteCount
-                        + " byte are different." + newline,null);
+                        + " byte are different." + newline);
+                if (!failure && byteCount == 0)
+                    failure = false;
+                else
+                    failure = true;
+            } else if (this.action == Action.BLANK) {
+                int i, byteCount = 0;
+                //this.readEEPROM();
+                for (i = 0; i < maxAddress; i++) {
+                    if (eeprom[i] != -1)
+                        break;
+                }
+                if (i == maxAddress) {
+                    appendToLog( "Blank check success! " + newline );
+                    if (!failure) failure = false;
+                } else {
+                    appendToLog( "Blank check failed! " + newline );
+                    failure = true;
+                }
             }
-        } catch (BadLocationException e) {
-            System.err.println("Output Error");
-        }
-
+            CheckSequence();
         }
     }
 
@@ -167,6 +185,9 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         public WriteTask(int a, int l) {
             this.len = l;
             this.address = a;
+            statusLabel.setText("");
+            progressBar.setValue(0);
+            setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         }
         /*
          * Main task. Executed in background thread.
@@ -174,34 +195,42 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
 
         @Override
         public Void doInBackground() {
-            try{
             try {
+                int c;
+                failure = false;
                 //take time to read the eeprom
                 start = System.currentTimeMillis();
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(mySerial.out));
                 String line = "";
-                log.insertString(log.getLength(), "sending command." + newline,null);
+                appendToLog("sending command." + newline);
+
+                bw.write("P" + newline);
+                bw.flush();
+
                 for (int i = 0; i < len; i += 1024) {
                     bw.write("w," + Utility.wordToHex(address + i) + "," + Utility.wordToHex(1024) + newline);
                     bw.flush();
                     writeProgress = i * 100 / len;
                     setProgress(writeProgress);
                     mySerial.out.write(data, i, 1024);
-                    log.insertString(log.getLength(), "wrote data from 0x" + Utility.wordToHex(address + i)
-                            + " to 0x" + Utility.wordToHex(address + i + 1023) + newline,null);
-                    byte c = ' ';
+                    appendToLog("wrote data from 0x" + Utility.wordToHex(address + i)
+                            + " to 0x" + Utility.wordToHex(address + i + 1023) + newline);
                     do {
-                        c = (byte) mySerial.in.read();
+                        c = mySerial.in.read();
+                        if (c == -1) throw new Exception("Communication timeout");
                     } while (c != '%');
 
                 }
+
+                bw.write("p" + newline);
+                bw.flush();
+
                 end = System.currentTimeMillis();
                 setProgress(100);
 
-
-
             } catch (Exception e) {
-                log.insertString(log.getLength(), "Error: " + e.getMessage() + newline,null);
+                appendToLog("Error: " + e.getMessage() + newline);
+                failure = true;
             }
 
             /**
@@ -213,9 +242,6 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
              * maxAddress; done = i; setProgress(Math.min(progress, 100)); }
              * setProgress(100); return null; *
              */
-        } catch (BadLocationException e) {
-            System.err.println("Output Error");
-        }
             return null;
             
         }
@@ -226,22 +252,18 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         @Override
         public void done() {
             Toolkit.getDefaultToolkit().beep();
-            clearButton.setEnabled(true);
+            eraseButton.setEnabled(true);
             writeButton.setEnabled(true);
-            readButton.setEnabled(true);
             setCursor(null); //turn off the wait cursor
-            try{
-            log.insertString(log.getLength(), "data sent." + newline,null);
+            appendToLog("data sent." + newline);
 
-            log.insertString(log.getLength(), "wrote " + len + " bytes from 0x"
+            appendToLog("wrote " + len + " bytes from 0x"
                     + Utility.wordToHex(address) + " to 0x"
                     + Utility.wordToHex(address + (int) len - 1) + " in "
                     + (float) (end - start) / 1000
-                    + " seconds " + newline,null);
-        } catch (BadLocationException e) {
-            System.err.println("Output Error");
-        }
-
+                    + " seconds " + newline);
+            if (!failure) failure = false;
+            CheckSequence();
         }
     }
 
@@ -260,11 +282,17 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
      * Creates new form MainFrame
      */
     public MainFrame() {
-
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch(Exception e) {
+            System.err.println("Error setting native LAF: " + e);
+        }
+        
         initComponents();
 
         //Create a file chooser
         fc = new JFileChooser();
+        fc.setPreferredSize(new Dimension(500, 600));
 
         StyleContext sc = StyleContext.getDefaultStyleContext();
         AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, Color.BLACK);
@@ -272,13 +300,58 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         aset = sc.addAttribute(aset, StyleConstants.FontFamily, "Lucida Console");
         aset = sc.addAttribute(aset, StyleConstants.Alignment, StyleConstants.ALIGN_JUSTIFIED);
 
-        int len = textPane.getDocument().getLength();
-        textPane.setCaretPosition(len);
         textPane.setCharacterAttributes(aset, false);
-
-
     }
 
+    private void CheckSequence() {
+        if (failure == true && sequenceCtr != 0) sequenceCtr = 1;
+        
+        switch (sequenceCtr) {
+            case 5:
+                sequenceCtr --;
+                if (eraseCheckBox.isSelected()) {
+                    eraseButtonActionPerformed(null);
+                    break;
+                }
+            case 4:
+                sequenceCtr --;
+                if (blankCheckBox.isSelected()) {
+                    blankButtonActionPerformed(null);
+                    break;
+                }
+            case 3:
+                sequenceCtr --;
+                if (writeCheckBox.isSelected()) {
+                    writeButtonActionPerformed(null);
+                    break;
+                }
+            case 2:
+                sequenceCtr --;
+                if (verifyCheckBox.isSelected()) {
+                    verifyButtonActionPerformed(null);
+                    break;
+                }
+            case 1:
+                sequenceCtr --;
+                sequenceButton.setEnabled(true);
+            default:
+                if (failure == true) {
+                    statusLabel.setText("Failure!");
+                    statusLabel.setForeground(Color.red);
+                } else {
+                    statusLabel.setText("Success!");
+                    statusLabel.setForeground(Color.decode("#00C000"));
+                }
+//                statusLabel.setText("");
+                break;
+        }
+    }            
+
+    private void CheckConnected() {
+        if (mySerial.isConnected() == false) {
+            serialSelectActionPerformed(null);
+        }
+    }
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -293,7 +366,8 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         writeButton = new javax.swing.JButton();
         serialSelect = new javax.swing.JComboBox();
         readButton = new javax.swing.JButton();
-        clearButton = new javax.swing.JButton();
+        eraseButton = new javax.swing.JButton();
+        blankButton = new javax.swing.JButton();
         loadButton = new javax.swing.JButton();
         saveButton = new javax.swing.JButton();
         versionButton = new javax.swing.JButton();
@@ -304,7 +378,13 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         offsetSelect = new javax.swing.JComboBox();
         showImageButton = new javax.swing.JButton();
         showDataButton = new javax.swing.JButton();
-        showDiffButton = new javax.swing.JButton();
+        verifyButton = new javax.swing.JButton();
+        sequenceButton = new javax.swing.JButton();
+        eraseCheckBox = new javax.swing.JCheckBox();
+        blankCheckBox = new javax.swing.JCheckBox();
+        writeCheckBox = new javax.swing.JCheckBox();
+        verifyCheckBox = new javax.swing.JCheckBox();
+        statusLabel = new javax.swing.JLabel();
         jScrollPane2 = new javax.swing.JScrollPane();
         textPane = new javax.swing.JTextPane();
 
@@ -313,7 +393,12 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         setBounds(new java.awt.Rectangle(0, 0, 0, 0));
         setMinimumSize(new java.awt.Dimension(800, 600));
 
-        writeButton.setText("Write EEPROM");
+        progressBar.setToolTipText("Progress indicator");
+        progressBar.setFocusable(false);
+        progressBar.setStringPainted(true);
+
+        writeButton.setText("Write");
+        writeButton.setToolTipText("Write to chip");
         writeButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 writeButtonActionPerformed(evt);
@@ -333,21 +418,32 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
             }
         });
 
-        readButton.setText("Read EEPROM");
+        readButton.setText("Read");
+        readButton.setToolTipText("Read from chip");
         readButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 readButtonActionPerformed(evt);
             }
         });
 
-        clearButton.setText("Clear EEPROM");
-        clearButton.addActionListener(new java.awt.event.ActionListener() {
+        eraseButton.setText("Erase");
+        eraseButton.setToolTipText("Erase chip");
+        eraseButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                clearButtonActionPerformed(evt);
+                eraseButtonActionPerformed(evt);
+            }
+        });
+
+        blankButton.setText("Blank Chk");
+        blankButton.setToolTipText("Check if chip is blank");
+        blankButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                blankButtonActionPerformed(evt);
             }
         });
 
         loadButton.setText("Load Image");
+        loadButton.setToolTipText("Load image from disk");
         loadButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 loadButtonActionPerformed(evt);
@@ -355,6 +451,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         });
 
         saveButton.setText("Save Image");
+        saveButton.setToolTipText("Save image to disk");
         saveButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 saveButtonActionPerformed(evt);
@@ -362,6 +459,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         });
 
         versionButton.setText("Version");
+        versionButton.setToolTipText("Programmer versioning");
         versionButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 versionButtonActionPerformed(evt);
@@ -372,7 +470,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
 
         jLabel2.setText("EEPROM Type :");
 
-        eepromTypeSelect.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "28C64  (8k) ", "28C128 (16k)", "28C256 (32k)" }));
+        eepromTypeSelect.setModel(new javax.swing.DefaultComboBoxModel(EEPROMTYPES));
         eepromTypeSelect.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 eepromTypeSelectActionPerformed(evt);
@@ -381,7 +479,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
 
         jLabel3.setText("Offset :");
 
-        offsetSelect.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "---", " 1k", " 2k", " 3k", " 4k", " 5k", " 6k", " 7k", " 8k", " 9k", "10k", "11k", "12k", "13k", "14k", "15k", "16k", "17k", "18k", "19k", "20k", "21k", "22k", "23k", "24k", "25k", "26k", "27k", "28k", "29k", "30k", "31k" }));
+        offsetSelect.setModel(new javax.swing.DefaultComboBoxModel(OFFSETS));
         offsetSelect.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 offsetSelectActionPerformed(evt);
@@ -389,6 +487,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         });
 
         showImageButton.setText("Show Image");
+        showImageButton.setToolTipText("Display image buffer on screen");
         showImageButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 showImageButtonActionPerformed(evt);
@@ -396,101 +495,152 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         });
 
         showDataButton.setText("Show Data");
+        showDataButton.setToolTipText("Display chip buffer on screen");
         showDataButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 showDataButtonActionPerformed(evt);
             }
         });
 
-        showDiffButton.setText("Show Diff");
-        showDiffButton.addActionListener(new java.awt.event.ActionListener() {
+        verifyButton.setText("Verify");
+        verifyButton.setToolTipText("Verify chip matches loaded image");
+        verifyButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                showDiffButtonActionPerformed(evt);
+                verifyButtonActionPerformed(evt);
             }
         });
+
+        sequenceButton.setText("Run Sequence");
+        sequenceButton.setToolTipText("Perform every box checked in sequence");
+        sequenceButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                sequenceButtonActionPerformed(evt);
+            }
+        });
+
+        eraseCheckBox.setSelected(true);
+        eraseCheckBox.setText("Erase");
+
+        blankCheckBox.setSelected(true);
+        blankCheckBox.setText("Blank Chk");
+
+        writeCheckBox.setSelected(true);
+        writeCheckBox.setText("Write");
+
+        verifyCheckBox.setSelected(true);
+        verifyCheckBox.setText("Verify");
+
+        statusLabel.setFont(new java.awt.Font("Ubuntu", 0, 18)); // NOI18N
 
         org.jdesktop.layout.GroupLayout jPanel1Layout = new org.jdesktop.layout.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel1Layout.createSequentialGroup()
-                .add(25, 25, 25)
+                .addContainerGap()
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel1Layout.createSequentialGroup()
-                        .add(clearButton)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(eraseButton)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                        .add(blankButton)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                         .add(readButton)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                         .add(writeButton)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 298, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                        .add(verifyButton))
                     .add(jPanel1Layout.createSequentialGroup()
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                             .add(jPanel1Layout.createSequentialGroup()
+                                .add(jLabel2)
+                                .add(18, 18, 18)
+                                .add(eepromTypeSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 135, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                                .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel1Layout.createSequentialGroup()
+                                    .add(loadButton)
+                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                                    .add(saveButton)
+                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                    .add(jLabel3)
+                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                    .add(offsetSelect, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel1Layout.createSequentialGroup()
+                                    .add(sequenceButton)
+                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                    .add(eraseCheckBox)
+                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                    .add(blankCheckBox)
+                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                    .add(writeCheckBox))))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(verifyCheckBox)))
+                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel1Layout.createSequentialGroup()
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel1Layout.createSequentialGroup()
                                 .add(jLabel1)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(serialSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 245, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(serialSelect, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel1Layout.createSequentialGroup()
+                                .add(versionButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 63, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(12, 12, 12)
+                                .add(showImageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 107, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(jLabel2)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(eepromTypeSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 135, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .add(jLabel3)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED))
-                            .add(jPanel1Layout.createSequentialGroup()
-                                .add(loadButton)
-                                .add(18, 18, 18)
-                                .add(saveButton)
-                                .add(18, 18, 18)
-                                .add(versionButton)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .add(showImageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 125, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(18, 18, 18)
-                                .add(showDataButton)
-                                .add(24, 24, 24)))
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(offsetSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(showDiffButton))
-                        .add(18, 18, 18))))
+                                .add(showDataButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 97, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(progressBar, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .add(383, 383, 383))
+                    .add(jPanel1Layout.createSequentialGroup()
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(statusLabel)
+                        .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1Layout.createSequentialGroup()
-                .addContainerGap(12, Short.MAX_VALUE)
+            .add(jPanel1Layout.createSequentialGroup()
+                .addContainerGap()
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(showDataButton)
-                        .add(showDiffButton)
+                        .add(versionButton)
                         .add(showImageButton))
                     .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(loadButton)
                         .add(saveButton)
-                        .add(versionButton)))
+                        .add(offsetSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(jLabel3)))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(serialSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(jLabel1))
-                    .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                        .add(offsetSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(jLabel3))
-                    .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(eepromTypeSelect, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(jLabel2)))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1Layout.createSequentialGroup()
-                        .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(5, 5, 5))
-                    .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                        .add(writeButton)
-                        .add(readButton)
-                        .add(clearButton))))
+                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                    .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                        .add(eraseButton)
+                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                            .add(verifyButton)
+                            .add(writeButton)
+                            .add(readButton)
+                            .add(blankButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 27, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                    .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(eraseCheckBox)
+                    .add(blankCheckBox)
+                    .add(writeCheckBox)
+                    .add(verifyCheckBox)
+                    .add(sequenceButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 27, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(statusLabel))
+                .addContainerGap())
         );
 
         textPane.setEditable(false);
         textPane.setFont(new java.awt.Font("Monospaced", 0, 12)); // NOI18N
+        textPane.setFocusable(false);
         jScrollPane2.setViewportView(textPane);
         log = textPane.getStyledDocument();
 
@@ -498,172 +648,41 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 800, Short.MAX_VALUE)
-            .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .add(jScrollPane2)
+            .add(layout.createSequentialGroup()
+                .add(46, 46, 46)
+                .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 706, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(48, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
                 .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 493, Short.MAX_VALUE))
+                .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 506, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void appendToLog(String text) {
-        try {
-            log.insertString(log.getLength(),text,null);
-        } catch (BadLocationException e) {
-         System.err.println("Output Error" + e.getMessage() + newline);   
-        }
-    }
-    
-    private void serialSelectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_serialSelectActionPerformed
-        appendToLog("now selected: " + serialSelect.getSelectedItem() + newline);
-        selectedComPort = (String) serialSelect.getSelectedItem();
-        try {
-            mySerial.disconnect();
-            mySerial.connect(selectedComPort, 57600);
-            log.insertString(log.getLength(), selectedComPort + " is now connected." + newline,null);
-            Thread.sleep(1000);
-        } catch (Exception ex) {
-           appendToLog( "Error : " + ex.getMessage() + newline);
-        }
+    private void sequenceButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sequenceButtonActionPerformed
+        sequenceButton.setEnabled(false);
+        sequenceCtr = 5;
+        failure = false;
+        CheckSequence();
+    }//GEN-LAST:event_sequenceButtonActionPerformed
 
-    }//GEN-LAST:event_serialSelectActionPerformed
+    private void verifyButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_verifyButtonActionPerformed
+        verifyButton.setEnabled(false);
 
-    private void writeButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_writeButtonActionPerformed
-        writeButton.setEnabled(false);
-        progressBar.setValue(0);
-        readwrite = 1;
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        CheckConnected();
+
         //Instances of javax.swing.SwingWorker are not reusuable, so
         //we create new instances as needed.
-        writeTask = new WriteTask(offset, (int) filesize);
-        writeTask.addPropertyChangeListener(this);
-        writeTask.execute();
-
-    }//GEN-LAST:event_writeButtonActionPerformed
-
-    private void loadButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadButtonActionPerformed
-        int returnVal = fc.showOpenDialog(this);
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            File file = fc.getSelectedFile();
-            //This is where a real application would open the file.
-            appendToLog( "Opening: " + file.getAbsolutePath() + "."
-                    + newline);
-            if (file.length() <= 32768) {
-                loadFile(file);
-            } else {
-                appendToLog( "Error: " + file.getName()
-                        + "is too big to load.");
-            }
-        } else {
-            appendToLog( "Open command cancelled by user." + newline);
-        }
-
-    }//GEN-LAST:event_loadButtonActionPerformed
-
-    private void eepromTypeSelectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_eepromTypeSelectActionPerformed
-        switch (eepromTypeSelect.getSelectedIndex()) {
-            case 0:
-                maxAddress = 8192;
-                break;
-            case 1:
-                maxAddress = 16384;
-                break;
-            case 2:
-                maxAddress = 32768;
-                break;
-            default:
-                maxAddress = 8192;
-                break;
-        }
-
-        int len = textPane.getDocument().getLength();
-        textPane.setCaretPosition(len);
-        appendToLog( "now selected: " + eepromTypeSelect.getSelectedItem()
-                + ", address range = 0x0000 to 0x"
-                + Utility.wordToHex(maxAddress - 1) + newline);
-       
-    }//GEN-LAST:event_eepromTypeSelectActionPerformed
-
-    private void offsetSelectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_offsetSelectActionPerformed
-        offset = offsetSelect.getSelectedIndex() * 1024;
-
-        appendToLog("Offset is now set to : " + offsetSelect.getSelectedItem() + newline);
-        appendToLog("data will be written from 0x" + Utility.wordToHex(offset) + newline);
-
-        if (offset + filesize > maxAddress) {
-            JOptionPane.showMessageDialog(this, "The offset you choose will cause the current file not to fit in the choosen EEPROM anymore", "Warning", JOptionPane.WARNING_MESSAGE);
-            textPane.setForeground(Color.red);
-            appendToLog("WARNING!! The offset you choose will cause the current file not to fit in the choosen EEPROM anymore " + newline);
-            textPane.setForeground(Color.black);
-
-            textPane.setCaretPosition(textPane.getDocument().getLength());
-        }
-        
-    }//GEN-LAST:event_offsetSelectActionPerformed
-
-    private void versionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_versionButtonActionPerformed
-            appendToLog("Simple JBurn - Revision : " + revision + ", " + date + newline);
-        if (mySerial.isConnected()) {
-            try {
-                mySerial.out.write('V');
-                mySerial.out.write('\n');
-                String line = "";
-                byte c = ' ';
-                do {
-                    c = (byte) mySerial.in.read();
-                    line = line + (char) c;
-                    if (c == '\n') {
-                        appendToLog( line);
-                        line = "";
-                    }
-                } while (c != '\n');
-            } catch (Exception e) {
-                appendToLog("Error: " + e.getMessage() + newline);
-            }
-        } else {
-            appendToLog("Error: Not connected to any Programmer!" + newline);
-        }
-    }//GEN-LAST:event_versionButtonActionPerformed
-
-    private void saveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveButtonActionPerformed
-            int returnVal = fc.showSaveDialog(this);
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            File file = fc.getSelectedFile();
-            //This is where a real application would open the file.
-            appendToLog("Saving: " + file.getAbsolutePath() + "."
-                    + newline);
-            try {
-                FileOutputStream fout = new FileOutputStream(file.getAbsolutePath());
-                fout.write(eeprom, 0, maxAddress);
-                appendToLog( maxAddress + " bytes saved to \"" + file.getName() + "\"" + newline);
-            } catch (IOException e) {
-                appendToLog( "Error while saving file");
-            }
-        } else {
-            appendToLog( "Save command cancelled by user." + newline);
-        }
-    }//GEN-LAST:event_saveButtonActionPerformed
-
-    private void showImageButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showImageButtonActionPerformed
-        String line = "";
-        for (int i = 0; i < maxAddress; i++) {
-            if (i % 32 == 0) {
-                line = line + "0x" + Utility.wordToHex(i) + "  ";
-            }
-            line = line + Utility.byteToHex(data[i]) + " ";
-            if (i % 32 == 31) {
-                appendToLog( line + newline);
-                line = "";
-            }
-
-        }
-    }//GEN-LAST:event_showImageButtonActionPerformed
+        readTask = new ReadTask(Action.DIFF);
+        readTask.addPropertyChangeListener(this);
+        readTask.execute();
+    }//GEN-LAST:event_verifyButtonActionPerformed
 
     private void showDataButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showDataButtonActionPerformed
         String line = "";
@@ -680,50 +699,239 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         }
     }//GEN-LAST:event_showDataButtonActionPerformed
 
-    private void showDiffButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showDiffButtonActionPerformed
-        readButton.setEnabled(false);
-        readwrite = 2;
-        progressBar.setValue(0);
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+    private void showImageButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showImageButtonActionPerformed
+        String line = "";
+        for (int i = 0; i < maxAddress; i++) {
+            if (i % 32 == 0) {
+                line = line + "0x" + Utility.wordToHex(i) + "  ";
+            }
+            line = line + Utility.byteToHex(data[i]) + " ";
+            if (i % 32 == 31) {
+                appendToLog( line + newline);
+                line = "";
+            }
+
+        }
+    }//GEN-LAST:event_showImageButtonActionPerformed
+
+    private void offsetSelectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_offsetSelectActionPerformed
+        if (offsetSelect.getSelectedIndex() == 0)
+            offset = 0;
+        else
+            offset =  Integer.parseInt(offsetSelect.getSelectedItem().toString().replaceAll("[\\D]", "")) * 1024;
+
+        appendToLog("Offset is now set to : " + offsetSelect.getSelectedItem() + newline);
+        appendToLog("data will be written from 0x" + Utility.wordToHex(offset) + newline);
+
+        if (offset + filesize > maxAddress) {
+            JOptionPane.showMessageDialog(this, "The offset you choose will cause the current file not to fit in the choosen EEPROM anymore", "Warning", JOptionPane.WARNING_MESSAGE);
+            textPane.setForeground(Color.red);
+            appendToLog("WARNING!! The offset you choose will cause the current file not to fit in the choosen EEPROM anymore " + newline);
+            textPane.setForeground(Color.black);
+        }
+    }//GEN-LAST:event_offsetSelectActionPerformed
+
+    private void eepromTypeSelectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_eepromTypeSelectActionPerformed
+        switch (eepromTypeSelect.getSelectedIndex()) {
+            case 0:
+            maxAddress = 8192;
+            chipType = 0;
+            break;
+            case 1:
+            maxAddress = 16384;
+            chipType = 2;
+            break;
+            case 2:
+            maxAddress = 32768;
+            chipType = 2;
+            break;
+            case 3:
+            maxAddress = 65536;
+            chipType = 3;
+            break;
+            default:
+            maxAddress = 8192;
+            chipType = 0;
+            break;
+        }
+
+        CheckConnected();
+
+        try {
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(mySerial.out));
+            bw.write("C," + Utility.wordToHex(chipType) + newline);
+            bw.flush();
+        } catch (Exception e) {
+            appendToLog("Error: " + e.getMessage() + newline);
+        }
+
+        appendToLog( "now selected: " + eepromTypeSelect.getSelectedItem()
+            + ", address range = 0x0000 to 0x"
+            + Utility.wordToHex(maxAddress - 1) + newline);
+    }//GEN-LAST:event_eepromTypeSelectActionPerformed
+
+    private void versionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_versionButtonActionPerformed
+        appendToLog("Simple JBurn - Revision : " + revision + ", " + date + newline);
+        if (mySerial.isConnected()) {
+            try {
+                mySerial.out.write('V');
+                mySerial.out.write('\n');
+                String line = "";
+                int c;
+                do {
+                    c = mySerial.in.read();
+                    if (c == -1) throw new Exception("Communication timeout");
+                    line = line + (char) c;
+                    if (c == '\n') {
+                        appendToLog( line);
+                        line = "";
+                    }
+                } while (c != '\n');
+            } catch (Exception e) {
+                appendToLog("Error: " + e.getMessage() + newline);
+            }
+        } else {
+            appendToLog("Error: Not connected to any Programmer!" + newline);
+        }
+    }//GEN-LAST:event_versionButtonActionPerformed
+
+    private void saveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveButtonActionPerformed
+        int returnVal = fc.showSaveDialog(this);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File file = fc.getSelectedFile();
+            //This is where a real application would open the file.
+            appendToLog("Saving: " + file.getAbsolutePath() + "."
+                + newline);
+            try {
+                FileOutputStream fout = new FileOutputStream(file.getAbsolutePath());
+                fout.write(eeprom, 0, maxAddress);
+                appendToLog( maxAddress + " bytes saved to \"" + file.getName() + "\"" + newline);
+            } catch (IOException e) {
+                appendToLog( "Error while saving file");
+            }
+        } else {
+            appendToLog( "Save command cancelled by user." + newline);
+        }
+    }//GEN-LAST:event_saveButtonActionPerformed
+
+    private void loadButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadButtonActionPerformed
+        int returnVal = fc.showOpenDialog(this);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File file = fc.getSelectedFile();
+            //This is where a real application would open the file.
+            appendToLog( "Opening: " + file.getAbsolutePath() + "."
+                + newline);
+            if (file.length() <= 65536) {
+                loadFile(file);
+            } else {
+                appendToLog( "Error: " + file.getName()
+                    + " is too big to load.");
+            }
+        } else {
+            appendToLog( "Open command cancelled by user." + newline);
+        }
+    }//GEN-LAST:event_loadButtonActionPerformed
+
+    private void blankButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_blankButtonActionPerformed
+        blankButton.setEnabled(false);
+
+        CheckConnected();
+
         //Instances of javax.swing.SwingWorker are not reusuable, so
         //we create new instances as needed.
-        readTask = new ReadTask(true);
+        readTask = new ReadTask(Action.BLANK);
         readTask.addPropertyChangeListener(this);
         readTask.execute();
+    }//GEN-LAST:event_blankButtonActionPerformed
 
+    private void eraseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_eraseButtonActionPerformed
+        eraseButton.setEnabled(false);
 
-    }//GEN-LAST:event_showDiffButtonActionPerformed
+        CheckConnected();
+
+        statusLabel.setText("");
+        progressBar.setValue(0);
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        appendToLog("Erasing EEPROM." + newline);
+        try {
+            int c;
+            mySerial.out.write('E');
+            mySerial.out.write('\n');
+            do {
+                c = mySerial.in.read();
+                if (c == -1) throw new Exception("Communication timeout");
+            } while (c != '%');
+
+            failure = false;
+            appendToLog("Completed." + newline);
+        } catch (Exception e) {
+            appendToLog("Error: " + e.getMessage() + newline);
+            failure = true;
+        }
+        eraseButton.setEnabled(true);
+        setCursor(null); //turn off the wait cursor
+        CheckSequence();
+    }//GEN-LAST:event_eraseButtonActionPerformed
 
     private void readButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_readButtonActionPerformed
         readButton.setEnabled(false);
-        readwrite = 2;
-        progressBar.setValue(0);
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+        CheckConnected();
+
         //Instances of javax.swing.SwingWorker are not reusuable, so
         //we create new instances as needed.
-        readTask = new ReadTask(false);
+        readTask = new ReadTask(Action.READ);
         readTask.addPropertyChangeListener(this);
         readTask.execute();
     }//GEN-LAST:event_readButtonActionPerformed
 
-    private void clearButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearButtonActionPerformed
-        appendToLog("Clearing EEPROM. setting " + maxAddress + " bytes to 0x00"
-                + newline);
-        for (int i = 0; i < maxAddress; i++) {
-            data[i] = 0;
+    private void serialSelectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_serialSelectActionPerformed
+        if (serialSelect.getSelectedItem() == null) return;
+        
+        appendToLog("now selected: " + serialSelect.getSelectedItem() + newline);
+        selectedComPort = (String) serialSelect.getSelectedItem();
+        try {
+            mySerial.disconnect();
+            mySerial.connect(selectedComPort, 460800);
+            appendToLog(selectedComPort + " is now connected." + newline);
+
+            // Wait for Arduino to connect
+            Thread.sleep(2000);
+        } catch (Exception ex) {
+            appendToLog( "Error : " + ex.getMessage() + newline);
         }
-        clearButton.setEnabled(false);
-        readwrite = 0;
-        progressBar.setValue(0);
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+    }//GEN-LAST:event_serialSelectActionPerformed
+
+    private void writeButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_writeButtonActionPerformed
+        int size;
+        
+        if (maxAddress > filesize) size = (int)filesize;
+        else size = maxAddress;
+        
+        if (maxAddress < size + offset) size = maxAddress - offset;
+
+        writeButton.setEnabled(false);
+
+        CheckConnected();
+
         //Instances of javax.swing.SwingWorker are not reusuable, so
         //we create new instances as needed.
-        writeTask = new WriteTask(0, maxAddress);
+        
+        writeTask = new WriteTask(offset, size);
         writeTask.addPropertyChangeListener(this);
         writeTask.execute();
+    }//GEN-LAST:event_writeButtonActionPerformed
 
-    }//GEN-LAST:event_clearButtonActionPerformed
-
+    private void appendToLog(String text) {
+        int len = textPane.getDocument().getLength();
+        textPane.setCaretPosition(len);
+        try {
+            log.insertString(log.getLength(),text,null);
+        } catch (BadLocationException e) {
+            System.err.println("Output Error" + e.getMessage() + newline);   
+        }
+    }
+    
     public void loadFile(File file) {
             try {
                 FileInputStream fin = new FileInputStream(file.getAbsolutePath());
@@ -737,8 +945,11 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
             }
     }
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton clearButton;
+    private javax.swing.JButton blankButton;
+    private javax.swing.JCheckBox blankCheckBox;
     private javax.swing.JComboBox eepromTypeSelect;
+    private javax.swing.JButton eraseButton;
+    private javax.swing.JCheckBox eraseCheckBox;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
@@ -749,13 +960,17 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
     private javax.swing.JProgressBar progressBar;
     private javax.swing.JButton readButton;
     private javax.swing.JButton saveButton;
+    private javax.swing.JButton sequenceButton;
     private javax.swing.JComboBox serialSelect;
     private javax.swing.JButton showDataButton;
-    private javax.swing.JButton showDiffButton;
     private javax.swing.JButton showImageButton;
+    private javax.swing.JLabel statusLabel;
     public javax.swing.JTextPane textPane;
+    private javax.swing.JButton verifyButton;
+    private javax.swing.JCheckBox verifyCheckBox;
     private javax.swing.JButton versionButton;
     private javax.swing.JButton writeButton;
+    private javax.swing.JCheckBox writeCheckBox;
     // End of variables declaration//GEN-END:variables
     private JFileChooser fc;
     private StyledDocument log;

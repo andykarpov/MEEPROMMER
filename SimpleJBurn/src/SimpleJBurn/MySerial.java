@@ -53,6 +53,8 @@ public class MySerial {
                 serialPort = (SerialPort) commPort;
                 serialPort.setSerialPortParams(speed, SerialPort.DATABITS_8,
                         SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
+                serialPort.enableReceiveThreshold(1);
+                serialPort.enableReceiveTimeout(2000);
                 in = serialPort.getInputStream();
                 out = serialPort.getOutputStream();
 

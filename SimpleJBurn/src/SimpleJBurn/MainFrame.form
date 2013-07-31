@@ -13,6 +13,7 @@
   </Properties>
   <SyntheticProperties>
     <SyntheticProperty name="formSizePolicy" type="int" value="1"/>
+    <SyntheticProperty name="generateCenter" type="boolean" value="false"/>
   </SyntheticProperties>
   <AuxValues>
     <AuxValue name="FormSettings_autoResourcing" type="java.lang.Integer" value="0"/>
@@ -29,8 +30,12 @@
   <Layout>
     <DimensionLayout dim="0">
       <Group type="103" groupAlignment="0" attributes="0">
-          <Component id="jScrollPane2" alignment="0" pref="800" max="32767" attributes="0"/>
-          <Component id="jPanel1" alignment="1" max="32767" attributes="0"/>
+          <Component id="jScrollPane2" max="32767" attributes="0"/>
+          <Group type="102" alignment="0" attributes="0">
+              <EmptySpace min="-2" pref="46" max="-2" attributes="0"/>
+              <Component id="jPanel1" min="-2" pref="706" max="-2" attributes="0"/>
+              <EmptySpace pref="48" max="32767" attributes="0"/>
+          </Group>
       </Group>
     </DimensionLayout>
     <DimensionLayout dim="1">
@@ -38,7 +43,7 @@
           <Group type="102" alignment="0" attributes="0">
               <Component id="jPanel1" min="-2" max="-2" attributes="0"/>
               <EmptySpace max="-2" attributes="0"/>
-              <Component id="jScrollPane2" pref="493" max="32767" attributes="0"/>
+              <Component id="jScrollPane2" pref="506" max="32767" attributes="0"/>
           </Group>
       </Group>
     </DimensionLayout>
@@ -49,51 +54,76 @@
       <Layout>
         <DimensionLayout dim="0">
           <Group type="103" groupAlignment="0" attributes="0">
-              <Group type="102" alignment="0" attributes="0">
-                  <EmptySpace min="-2" pref="25" max="-2" attributes="0"/>
+              <Group type="102" attributes="0">
+                  <EmptySpace max="-2" attributes="0"/>
                   <Group type="103" groupAlignment="0" attributes="0">
                       <Group type="102" alignment="0" attributes="0">
-                          <Component id="clearButton" min="-2" max="-2" attributes="0"/>
-                          <EmptySpace max="-2" attributes="0"/>
+                          <Component id="eraseButton" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                          <Component id="blankButton" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Component id="readButton" min="-2" max="-2" attributes="0"/>
-                          <EmptySpace max="-2" attributes="0"/>
+                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
                           <Component id="writeButton" min="-2" max="-2" attributes="0"/>
-                          <EmptySpace max="32767" attributes="0"/>
-                          <Component id="progressBar" min="-2" pref="298" max="-2" attributes="0"/>
-                          <EmptySpace max="32767" attributes="0"/>
+                          <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                          <Component id="verifyButton" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <Group type="102" alignment="0" attributes="0">
-                          <Group type="103" groupAlignment="0" attributes="0">
+                          <Group type="103" groupAlignment="1" attributes="0">
+                              <Group type="102" attributes="0">
+                                  <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
+                                  <EmptySpace type="separate" max="-2" attributes="0"/>
+                                  <Component id="eepromTypeSelect" min="-2" pref="135" max="-2" attributes="0"/>
+                              </Group>
+                              <Group type="103" groupAlignment="1" max="-2" attributes="0">
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="loadButton" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                      <Component id="saveButton" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="jLabel3" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="offsetSelect" max="32767" attributes="0"/>
+                                  </Group>
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="sequenceButton" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="eraseCheckBox" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="blankCheckBox" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="writeCheckBox" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                              </Group>
+                          </Group>
+                          <EmptySpace max="-2" attributes="0"/>
+                          <Component id="verifyCheckBox" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                  </Group>
+                  <Group type="103" groupAlignment="0" attributes="0">
+                      <Group type="102" attributes="0">
+                          <EmptySpace max="32767" attributes="0"/>
+                          <Group type="103" groupAlignment="1" max="-2" attributes="0">
                               <Group type="102" alignment="0" attributes="0">
                                   <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
                                   <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="serialSelect" min="-2" pref="245" max="-2" attributes="0"/>
-                                  <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                  <Component id="jLabel2" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                  <Component id="eepromTypeSelect" min="-2" pref="135" max="-2" attributes="0"/>
-                                  <EmptySpace max="32767" attributes="0"/>
-                                  <Component id="jLabel3" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <Component id="serialSelect" max="32767" attributes="0"/>
                               </Group>
                               <Group type="102" alignment="0" attributes="0">
-                                  <Component id="loadButton" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace type="separate" max="-2" attributes="0"/>
-                                  <Component id="saveButton" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace type="separate" max="-2" attributes="0"/>
-                                  <Component id="versionButton" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace max="32767" attributes="0"/>
-                                  <Component id="showImageButton" min="-2" pref="125" max="-2" attributes="0"/>
-                                  <EmptySpace type="separate" max="-2" attributes="0"/>
-                                  <Component id="showDataButton" min="-2" max="-2" attributes="0"/>
-                                  <EmptySpace min="-2" pref="24" max="-2" attributes="0"/>
+                                  <Component id="versionButton" min="-2" pref="63" max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="12" max="-2" attributes="0"/>
+                                  <Component id="showImageButton" min="-2" pref="107" max="-2" attributes="0"/>
+                                  <EmptySpace type="unrelated" max="-2" attributes="0"/>
+                                  <Component id="showDataButton" min="-2" pref="97" max="-2" attributes="0"/>
                               </Group>
+                              <Component id="progressBar" max="32767" attributes="0"/>
                           </Group>
-                          <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="offsetSelect" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="showDiffButton" alignment="0" min="-2" max="-2" attributes="0"/>
-                          </Group>
-                          <EmptySpace min="-2" pref="18" max="-2" attributes="0"/>
+                          <EmptySpace min="-2" pref="383" max="-2" attributes="0"/>
+                      </Group>
+                      <Group type="102" alignment="0" attributes="0">
+                          <EmptySpace max="-2" attributes="0"/>
+                          <Component id="statusLabel" min="-2" max="-2" attributes="0"/>
+                          <EmptySpace max="32767" attributes="0"/>
                       </Group>
                   </Group>
               </Group>
@@ -101,18 +131,19 @@
         </DimensionLayout>
         <DimensionLayout dim="1">
           <Group type="103" groupAlignment="0" attributes="0">
-              <Group type="102" alignment="1" attributes="0">
-                  <EmptySpace pref="12" max="32767" attributes="0"/>
+              <Group type="102" alignment="0" attributes="0">
+                  <EmptySpace min="-2" max="-2" attributes="0"/>
                   <Group type="103" groupAlignment="0" attributes="0">
                       <Group type="103" alignment="0" groupAlignment="3" attributes="0">
-                          <Component id="showDataButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="showDiffButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="showDataButton" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="versionButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="showImageButton" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                       <Group type="103" alignment="0" groupAlignment="3" attributes="0">
                           <Component id="loadButton" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="saveButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="versionButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="offsetSelect" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel3" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                   </Group>
                   <EmptySpace max="-2" attributes="0"/>
@@ -121,37 +152,50 @@
                           <Component id="serialSelect" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel1" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
-                      <Group type="103" alignment="0" groupAlignment="3" attributes="0">
-                          <Component id="offsetSelect" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="jLabel3" alignment="3" min="-2" max="-2" attributes="0"/>
-                      </Group>
-                      <Group type="103" alignment="0" groupAlignment="3" attributes="0">
+                      <Group type="103" alignment="1" groupAlignment="3" attributes="0">
                           <Component id="eepromTypeSelect" alignment="3" min="-2" max="-2" attributes="0"/>
                           <Component id="jLabel2" alignment="3" min="-2" max="-2" attributes="0"/>
                       </Group>
                   </Group>
                   <EmptySpace max="-2" attributes="0"/>
-                  <Group type="103" groupAlignment="0" attributes="0">
-                      <Group type="102" alignment="1" attributes="0">
-                          <Component id="progressBar" min="-2" max="-2" attributes="0"/>
-                          <EmptySpace min="-2" pref="5" max="-2" attributes="0"/>
+                  <Group type="103" groupAlignment="1" attributes="0">
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Component id="eraseButton" min="-2" max="-2" attributes="0"/>
+                          <Group type="103" alignment="0" groupAlignment="3" attributes="0">
+                              <Component id="verifyButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="writeButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="readButton" alignment="3" min="-2" max="-2" attributes="0"/>
+                              <Component id="blankButton" alignment="3" min="-2" pref="27" max="-2" attributes="0"/>
+                          </Group>
                       </Group>
-                      <Group type="103" groupAlignment="3" attributes="0">
-                          <Component id="writeButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="readButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                          <Component id="clearButton" alignment="3" min="-2" max="-2" attributes="0"/>
-                      </Group>
+                      <Component id="progressBar" min="-2" max="-2" attributes="0"/>
                   </Group>
+                  <EmptySpace min="-2" max="-2" attributes="0"/>
+                  <Group type="103" groupAlignment="3" attributes="0">
+                      <Component id="eraseCheckBox" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Component id="blankCheckBox" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Component id="writeCheckBox" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Component id="verifyCheckBox" alignment="3" min="-2" max="-2" attributes="0"/>
+                      <Component id="sequenceButton" alignment="3" min="-2" pref="27" max="-2" attributes="0"/>
+                      <Component id="statusLabel" alignment="0" min="-2" max="-2" attributes="0"/>
+                  </Group>
+                  <EmptySpace min="-2" max="-2" attributes="0"/>
               </Group>
           </Group>
         </DimensionLayout>
       </Layout>
       <SubComponents>
         <Component class="javax.swing.JProgressBar" name="progressBar">
+          <Properties>
+            <Property name="toolTipText" type="java.lang.String" value="Progress indicator"/>
+            <Property name="focusable" type="boolean" value="false"/>
+            <Property name="stringPainted" type="boolean" value="true"/>
+          </Properties>
         </Component>
         <Component class="javax.swing.JButton" name="writeButton">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Write EEPROM"/>
+            <Property name="text" type="java.lang.String" value="Write"/>
+            <Property name="toolTipText" type="java.lang.String" value="Write to chip"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="writeButtonActionPerformed"/>
@@ -172,23 +216,35 @@
         </Component>
         <Component class="javax.swing.JButton" name="readButton">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Read EEPROM"/>
+            <Property name="text" type="java.lang.String" value="Read"/>
+            <Property name="toolTipText" type="java.lang.String" value="Read from chip"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="readButtonActionPerformed"/>
           </Events>
         </Component>
-        <Component class="javax.swing.JButton" name="clearButton">
+        <Component class="javax.swing.JButton" name="eraseButton">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Clear EEPROM"/>
+            <Property name="text" type="java.lang.String" value="Erase"/>
+            <Property name="toolTipText" type="java.lang.String" value="Erase chip"/>
           </Properties>
           <Events>
-            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="clearButtonActionPerformed"/>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="eraseButtonActionPerformed"/>
+          </Events>
+        </Component>
+        <Component class="javax.swing.JButton" name="blankButton">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="Blank Chk"/>
+            <Property name="toolTipText" type="java.lang.String" value="Check if chip is blank"/>
+          </Properties>
+          <Events>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="blankButtonActionPerformed"/>
           </Events>
         </Component>
         <Component class="javax.swing.JButton" name="loadButton">
           <Properties>
             <Property name="text" type="java.lang.String" value="Load Image"/>
+            <Property name="toolTipText" type="java.lang.String" value="Load image from disk"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="loadButtonActionPerformed"/>
@@ -197,6 +253,7 @@
         <Component class="javax.swing.JButton" name="saveButton">
           <Properties>
             <Property name="text" type="java.lang.String" value="Save Image"/>
+            <Property name="toolTipText" type="java.lang.String" value="Save image to disk"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveButtonActionPerformed"/>
@@ -205,6 +262,7 @@
         <Component class="javax.swing.JButton" name="versionButton">
           <Properties>
             <Property name="text" type="java.lang.String" value="Version"/>
+            <Property name="toolTipText" type="java.lang.String" value="Programmer versioning"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="versionButtonActionPerformed"/>
@@ -222,12 +280,8 @@
         </Component>
         <Component class="javax.swing.JComboBox" name="eepromTypeSelect">
           <Properties>
-            <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-              <StringArray count="3">
-                <StringItem index="0" value="28C64  (8k) "/>
-                <StringItem index="1" value="28C128 (16k)"/>
-                <StringItem index="2" value="28C256 (32k)"/>
-              </StringArray>
+            <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
+              <Connection code="new javax.swing.DefaultComboBoxModel(EEPROMTYPES)" type="code"/>
             </Property>
           </Properties>
           <Events>
@@ -241,41 +295,8 @@
         </Component>
         <Component class="javax.swing.JComboBox" name="offsetSelect">
           <Properties>
-            <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-              <StringArray count="32">
-                <StringItem index="0" value="---"/>
-                <StringItem index="1" value=" 1k"/>
-                <StringItem index="2" value=" 2k"/>
-                <StringItem index="3" value=" 3k"/>
-                <StringItem index="4" value=" 4k"/>
-                <StringItem index="5" value=" 5k"/>
-                <StringItem index="6" value=" 6k"/>
-                <StringItem index="7" value=" 7k"/>
-                <StringItem index="8" value=" 8k"/>
-                <StringItem index="9" value=" 9k"/>
-                <StringItem index="10" value="10k"/>
-                <StringItem index="11" value="11k"/>
-                <StringItem index="12" value="12k"/>
-                <StringItem index="13" value="13k"/>
-                <StringItem index="14" value="14k"/>
-                <StringItem index="15" value="15k"/>
-                <StringItem index="16" value="16k"/>
-                <StringItem index="17" value="17k"/>
-                <StringItem index="18" value="18k"/>
-                <StringItem index="19" value="19k"/>
-                <StringItem index="20" value="20k"/>
-                <StringItem index="21" value="21k"/>
-                <StringItem index="22" value="22k"/>
-                <StringItem index="23" value="23k"/>
-                <StringItem index="24" value="24k"/>
-                <StringItem index="25" value="25k"/>
-                <StringItem index="26" value="26k"/>
-                <StringItem index="27" value="27k"/>
-                <StringItem index="28" value="28k"/>
-                <StringItem index="29" value="29k"/>
-                <StringItem index="30" value="30k"/>
-                <StringItem index="31" value="31k"/>
-              </StringArray>
+            <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
+              <Connection code="new javax.swing.DefaultComboBoxModel(OFFSETS)" type="code"/>
             </Property>
           </Properties>
           <Events>
@@ -285,6 +306,7 @@
         <Component class="javax.swing.JButton" name="showImageButton">
           <Properties>
             <Property name="text" type="java.lang.String" value="Show Image"/>
+            <Property name="toolTipText" type="java.lang.String" value="Display image buffer on screen"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showImageButtonActionPerformed"/>
@@ -293,18 +315,60 @@
         <Component class="javax.swing.JButton" name="showDataButton">
           <Properties>
             <Property name="text" type="java.lang.String" value="Show Data"/>
+            <Property name="toolTipText" type="java.lang.String" value="Display chip buffer on screen"/>
           </Properties>
           <Events>
             <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showDataButtonActionPerformed"/>
           </Events>
         </Component>
-        <Component class="javax.swing.JButton" name="showDiffButton">
+        <Component class="javax.swing.JButton" name="verifyButton">
           <Properties>
-            <Property name="text" type="java.lang.String" value="Show Diff"/>
+            <Property name="text" type="java.lang.String" value="Verify"/>
+            <Property name="toolTipText" type="java.lang.String" value="Verify chip matches loaded image"/>
           </Properties>
           <Events>
-            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="showDiffButtonActionPerformed"/>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="verifyButtonActionPerformed"/>
           </Events>
+        </Component>
+        <Component class="javax.swing.JButton" name="sequenceButton">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="Run Sequence"/>
+            <Property name="toolTipText" type="java.lang.String" value="Perform every box checked in sequence"/>
+          </Properties>
+          <Events>
+            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="sequenceButtonActionPerformed"/>
+          </Events>
+        </Component>
+        <Component class="javax.swing.JCheckBox" name="eraseCheckBox">
+          <Properties>
+            <Property name="selected" type="boolean" value="true"/>
+            <Property name="text" type="java.lang.String" value="Erase"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JCheckBox" name="blankCheckBox">
+          <Properties>
+            <Property name="selected" type="boolean" value="true"/>
+            <Property name="text" type="java.lang.String" value="Blank Chk"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JCheckBox" name="writeCheckBox">
+          <Properties>
+            <Property name="selected" type="boolean" value="true"/>
+            <Property name="text" type="java.lang.String" value="Write"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JCheckBox" name="verifyCheckBox">
+          <Properties>
+            <Property name="selected" type="boolean" value="true"/>
+            <Property name="text" type="java.lang.String" value="Verify"/>
+          </Properties>
+        </Component>
+        <Component class="javax.swing.JLabel" name="statusLabel">
+          <Properties>
+            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+              <Font name="Ubuntu" size="18" style="0"/>
+            </Property>
+          </Properties>
         </Component>
       </SubComponents>
     </Container>
@@ -318,6 +382,7 @@
             <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
               <Font name="Monospaced" size="12" style="0"/>
             </Property>
+            <Property name="focusable" type="boolean" value="false"/>
           </Properties>
           <AuxValues>
             <AuxValue name="JavaCodeGenerator_AddingCodePost" type="java.lang.String" value="log = textPane.getStyledDocument();"/>
