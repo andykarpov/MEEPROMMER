@@ -206,11 +206,12 @@ inline void write_data_bus(byte data)
 #else
 //otherwise fallback to digitalWrite
 #define FAST_SHIFT(data) { \
-  /*--- Turn data on or off based on value of bit*/ \
+  /*shift out the top bit of the byte*/ \
   if (data & 0x80) \
     digitalWrite(DS, true); \
   else \
     digitalWrite(DS, false); \
+  /*shift data left so next bit is ready*/ \
   data <<= 1; \
   /*register shifts bits on upstroke of clock pin*/ \
   digitalWrite(CLOCK, true); \
