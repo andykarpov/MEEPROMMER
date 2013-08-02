@@ -134,12 +134,16 @@ void data_bus_output() {
 //be sure to set data_bus to input before
 byte read_data_bus()
 {
+  //access the port pins directly if possible, for speed
+  //the port pins do not match up with the data bits
+  //so we need to rearrange them
 #if defined(UNO)
   return (PIND >> 2) | ((PINB & 0x3) << 6);
 #elif defined(LEONARDO)
   return (PIND & 0x02) >> 1 | (PIND & 0x01) << 1 | (PIND & 0x10) >> 2 | (PINC & 0x40) >> 3 |
          (PIND & 0x80) >> 3 | (PINE & 0x40) >> 1 | (PINB & 0x30) << 2;
 #else
+  //fallback to digitalRead
   return ((digitalRead(D7) << 7) |
     (digitalRead(D6) << 6) |
     (digitalRead(D5) << 5) |
@@ -155,6 +159,9 @@ byte read_data_bus()
 //be sure to set data_bus to output before
 inline void write_data_bus(byte data)
 {
+  //access the ports directly if possible, for speed
+  //the ports do not match up with the data bits
+  //so we need to rearrange them
 #if defined(UNO)
   //2 bits belong to PORTB and have to be set separtely
   PORTB = (PORTB & 0xF8) | (data >> 6);
@@ -167,6 +174,7 @@ inline void write_data_bus(byte data)
           (data & 0x04) << 2 | (data & 0x10) << 3 | (data & 0x40) >> 3;
   PORTE = (PORTE & 0xBF) | (data & 0x20) << 1;
 #else
+  //fallback to digitalWrite
   digitalWrite(D0, data & 1);
   digitalWrite(D1, data & 2);
   digitalWrite(D2, data & 4);
@@ -180,19 +188,23 @@ inline void write_data_bus(byte data)
 
 
 //faster shiftOut function then normal IDE function
+//defined as macro so it can be 'unrolled' for more speed
+//set the port pins directly if possible
 #if (defined(UNO) || defined (LEONARDO))
 #define FAST_SHIFT(data) { \
-  /*--- Turn data on or off based on value of bit*/ \
+  /*shift out the top bit of the byte*/ \
   if (data & 0x80) \
     bitSet(STROBE_PORT,STROBE_DS); \
   else \
     bitClear(STROBE_PORT,STROBE_DS); \
+  /*shift data left so next bit is ready*/ \
   data <<= 1; \
   /*register shifts bits on upstroke of clock pin*/ \
   bitSet(STROBE_PORT,STROBE_CLOCK); \
   bitClear(STROBE_PORT,STROBE_CLOCK); \
 }
 #else
+//otherwise fallback to digitalWrite
 #define FAST_SHIFT(data) { \
   /*--- Turn data on or off based on value of bit*/ \
   if (data & 0x80) \
@@ -213,8 +225,11 @@ inline void set_address_bus(unsigned int address)
 
   //get high - byte of 16 bit address
   if (chipType == CHIP27SF512) {
+    //the 27x512 has different address pin wiring
+    //so we rearrange the bits here
     hi = (address >> 8) & 0x3F;
     hi |= (address >> 9) & 0x40;
+    //the 27x512 doesn't use WE, instead it's bit A14
 #if defined(UNO) || defined (LEONARDO)
     if (address & 0x4000)
         bitSet(STROBE_PORT, STROBE_WE);
@@ -230,13 +245,13 @@ inline void set_address_bus(unsigned int address)
   //get low - byte of 16 bit address
   low = address & 0xff;
 
-  //shift out highbyte
+  //shift out highbyte using macro for speed
   FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi);
   FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi);
   //shift out lowbyte
   FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low);
   FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low);
- 
+
 #if defined(UNO) || defined (LEONARDO)
   //strobe latch line
   bitSet(STROBE_PORT,STROBE_LATCH);
@@ -246,7 +261,7 @@ inline void set_address_bus(unsigned int address)
   digitalWrite(LATCH, false);
 #endif
 }
- 
+
 //short function to set the OE(output enable line of the eeprom)
 // attention, this line is LOW - active
 inline void set_oe (byte state)
@@ -265,6 +280,7 @@ inline void set_ce (byte state)
 // attention, this line is LOW - active
 inline void set_we (byte state)
 {
+  //the 27x512 doesn't have a WE pin
   switch (chipType) {
     case CHIP27SF512:
       break;
@@ -273,7 +289,7 @@ inline void set_we (byte state)
     }
 }
 
-//short function to set the VPP(programming voltage)
+//short function to connect the boost voltage to the VPP(program) pin
 // attention, this line is HIGH - active
 void set_vpp (byte state)
 {
@@ -286,22 +302,27 @@ void set_vpp (byte state)
   }
 }
 
+//this function turns on the PWM by accessing the registers directly
+//value is from 0-255. 0 = minimum duty, 255 = maximum duty
 void pwm_on(byte value)
 {
   //set PWM to 62 kHz
   //attach timer to pin
   //and write duty cycle
 #if defined(UNO)
+  //uses Arduino UNO pin 11, OC2A
   TCCR2A = 0x83;
   TCCR2B = 0x01;
   OCR2A = value;
 #elif defined(LEONARDO)
+  //uses Arduino Leonardo pin 11, OC1C
   TCCR1A = 0x09;
   TCCR1B = 0x09;
   OCR1C = value;
 #endif
 }
 
+//this function turns of the PWM altogether
 void pwm_off()
 {
   //turn off timer
@@ -312,8 +333,13 @@ void pwm_off()
 #endif
 }
 
+//this controls the boost supply for programming
+//if state is true, the supply is turned on
+//it also sets the PWM to get the correct
+// programming voltage depending on the chipType
 void boost_supply (boolean state)
 {
+  //there is currently no support for anything other than UNO or Leonardo
 #if (defined(UNO) || defined(LEONARDO))
   float duty;
 
@@ -334,7 +360,7 @@ void boost_supply (boolean state)
 #endif
 }
 
-//short function to set the VH(erase voltage)
+//short function to connect the boost voltage to the VH(erase) pin
 // attention, this line is HIGH - active
 void set_vh (byte state)
 {
@@ -347,6 +373,7 @@ void set_vh (byte state)
   }
 }
 
+//short function to set up the programmer for reading
 void read_start() {
   //set databus for reading
   data_bus_input();
@@ -358,6 +385,7 @@ void read_start() {
   set_oe(LOW);
 }
 
+//short function to stop reading
 void read_end() {
   //disable output
   set_oe(HIGH);
@@ -374,6 +402,7 @@ inline byte read_byte(unsigned int address)
   return read_data_bus();
 }
  
+//short function to set up the programmer for writing
 void write_start() {
   //first disable output
   set_oe(HIGH);
@@ -383,6 +412,7 @@ void write_start() {
   data_bus_output();
 }
 
+//short function to stop writing
 void write_end() {
   //set databus to input
   data_bus_input();
@@ -403,7 +433,10 @@ inline boolean fast_write(unsigned int address, byte data)
       //enable chip select
       set_ce(LOW);
   
-      //only wait for write if the address page has changed or chip is 28C64
+      //only wait for write if the address page has changed since the last write
+      //address page is 64 bytes, so xor the last address with the current one to
+      //look for a change
+      //28C64 does not support page writes so we poll every time
       if ((lastAddress ^ address) & 0xFFC0 || chipType == CHIP28C64)
       {
         unsigned long startTime = millis();
@@ -533,10 +566,6 @@ byte parseCommand() {
   return retval;
 }
  
-char chartohex[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-                    0, 0, 0, 0, 0, 0, 0,
-                    10, 11, 12, 13, 14, 15 };
-
 /************************************************************
  * convert a single hex digit (0-9,a-f) to byte
  * @param char c single character (digit)
@@ -544,6 +573,10 @@ char chartohex[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
  ************************************************************/
 inline byte hexDigit(char c)
 {
+  //use lookup table for char to hex conversion
+  const char chartohex[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+                    0, 0, 0, 0, 0, 0, 0,
+                    10, 11, 12, 13, 14, 15 };
   return chartohex[c - '0'];
 }
  
@@ -662,6 +695,7 @@ void chip_erase() {
       break;
     case CHIP28C256:
       //6 byte sequence to erase
+      //from Atmel "Software Chip Erase Application Note"
       write_start();
       set_address_bus(0x5555);
       set_we(LOW);
@@ -691,8 +725,12 @@ void chip_erase() {
       delay(20);
       break;
     case CHIP27SF512:
+      //27SF512 is erased by a 100+ms pulse on CE
+      //VH and VPP pins need the programming voltage
       set_ce(HIGH);
       set_oe(HIGH);
+      //the W27E512 needs the address and data bus
+      //a certain way for erase, 27SF512 doesn't care
       set_address_bus(0x200);
       write_data_bus(0xFF);
       set_vh(HIGH);
@@ -743,6 +781,7 @@ void printByte(byte data) {
  *
  *************************************************/
 void setup() {
+  //default to 28C64 for backward JBurn compatability
   chipType = CHIP28C64;
 
   //define the shiuftOut Pins as output
@@ -750,14 +789,17 @@ void setup() {
   pinMode(LATCH, OUTPUT);
   pinMode(CLOCK, OUTPUT);
  
-  //define the EEPROM Pins as output
-  // take care that they are HIGH
+  //define the boost pins as output
+  // take care that they are LOW
   digitalWrite(BOOST, LOW);
   pinMode(BOOST, OUTPUT);
   digitalWrite(VH, LOW);
   pinMode(VH, OUTPUT);
   digitalWrite(VPP, LOW);
   pinMode(VPP, OUTPUT);
+
+  //define the EEPROM Pins as output
+  // take care that they are HIGH
   digitalWrite(OE, HIGH);
   pinMode(OE, OUTPUT);
   digitalWrite(CE, HIGH);
@@ -766,6 +808,7 @@ void setup() {
   pinMode(WE, OUTPUT);
 
   //set speed of serial connection
+  //on Leonardo this is noop
 //  Serial.begin(115200);
   Serial.begin(460800);
 }
