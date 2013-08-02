@@ -16,7 +16,7 @@
 
 #if defined(__AVR_ATmega328P__)
 #define UNO
-#elif (defined(__AVR_ATmega32U4__)
+#elif defined(__AVR_ATmega32U4__)
 #define LEONARDO
 #endif
 
@@ -137,7 +137,7 @@ byte read_data_bus()
 #if defined(UNO)
   return (PIND >> 2) | ((PINB & 0x3) << 6);
 #elif defined(LEONARDO)
-  return (PIND & 0x2) >> 1 | (PIND & 0x1) << 1 | (PIND & 0x10) >> 2 | (PINC & 0x40) >> 3 |
+  return (PIND & 0x02) >> 1 | (PIND & 0x01) << 1 | (PIND & 0x10) >> 2 | (PINC & 0x40) >> 3 |
          (PIND & 0x80) >> 3 | (PINE & 0x40) >> 1 | (PINB & 0x30) << 2;
 #else
   return ((digitalRead(D7) << 7) |
@@ -164,7 +164,7 @@ inline void write_data_bus(byte data)
   PORTB = (PORTB & 0x8F) | (data & 0xC0) >> 2;
   PORTC = (PORTC & 0xBF) | (data & 0x08) << 3;
   PORTD = (PORTD & 0x6C) | (data & 0x01) << 1 | (data & 0x02) >> 1 |
-          (data & 0x04) << 2 | (data & 0x10) >> 3 | (data & 0x40) >> 3;
+          (data & 0x04) << 2 | (data & 0x10) << 3 | (data & 0x40) >> 3;
   PORTE = (PORTE & 0xBF) | (data & 0x20) << 1;
 #else
   digitalWrite(D0, data & 1);
@@ -286,15 +286,39 @@ void set_vpp (byte state)
   }
 }
 
-void boost_supply (byte state)
+void pwm_on(byte value)
 {
-  float duty;
-#if !(defined(UNO) || defined(LEONARDO))
-  return;
+  //set PWM to 62 kHz
+  //attach timer to pin
+  //and write duty cycle
+#if defined(UNO)
+  TCCR2A = 0x83;
+  TCCR2B = 0x01;
+  OCR2A = value;
+#elif defined(LEONARDO)
+  TCCR1A = 0x09;
+  TCCR1B = 0x09;
+  OCR1C = value;
 #endif
+}
+
+void pwm_off()
+{
+  //turn off timer
+#if defined(UNO)
+  TCCR2A = 0x01;
+#elif defined(LEONARDO)
+  TCCR1A = 0x01;
+#endif
+}
+
+void boost_supply (boolean state)
+{
+#if (defined(UNO) || defined(LEONARDO))
+  float duty;
 
   if (!state) {
-    analogWrite(BOOST, 0);
+    pwm_off();
     return;
   }
 
@@ -302,11 +326,12 @@ void boost_supply (byte state)
   case CHIP27SF512:
     // VPP voltage of 13.2V
     duty = 1 - (5 / (13.2 + 0.6));
-    analogWrite(BOOST, duty * 255);
+    pwm_on(duty * 255.0);
     break;
   default:
     break;
   }
+#endif
 }
 
 //short function to set the VH(erase voltage)
@@ -739,14 +764,6 @@ void setup() {
   pinMode(CE, OUTPUT);
   digitalWrite(WE, HIGH);
   pinMode(WE, OUTPUT);
-
-#if defined(UNO)
-  // Set PWM to 62 kHz
-  TCCR2B = (TCCR2B & 0xF8) | 1;
-#elif defined(LEONARDO)
-  // Set PWM to 62 kHz
-  TCCR0B = (TCCR0B & 0xF8) | 1;
-#endif
 
   //set speed of serial connection
 //  Serial.begin(115200);
