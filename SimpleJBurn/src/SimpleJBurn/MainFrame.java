@@ -668,7 +668,14 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
     }// </editor-fold>//GEN-END:initComponents
 
     private void blankButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_blankButtonActionPerformed
-        // TODO add your handling code here:
+        blankButton.setEnabled(false);
+
+        CheckConnected();
+        //Instances of javax.swing.SwingWorker are not reusuable, so
+        //we create new instances as needed.
+        readTask = new ReadTask(Action.BLANK);
+        readTask.addPropertyChangeListener(this);
+        readTask.execute();
     }//GEN-LAST:event_blankButtonActionPerformed
 
     private void sequenceButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sequenceButtonActionPerformed
