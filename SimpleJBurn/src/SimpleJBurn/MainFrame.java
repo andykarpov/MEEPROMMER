@@ -390,8 +390,10 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Simple JBurn 2");
+        setAlwaysOnTop(true);
         setBounds(new java.awt.Rectangle(0, 0, 0, 0));
-        setMinimumSize(new java.awt.Dimension(800, 600));
+        setMinimumSize(new java.awt.Dimension(770, 450));
+        setPreferredSize(new java.awt.Dimension(770, 600));
 
         progressBar.setToolTipText("Progress indicator");
         progressBar.setFocusable(false);
@@ -626,16 +628,16 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
                     .add(writeButton)
                     .add(verifyButton)
                     .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(sequenceButton)
+                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel1Layout.createSequentialGroup()
                         .add(3, 3, 3)
                         .add(statusLabel))
-                    .add(eraseCheckBox)
-                    .add(blankCheckBox)
-                    .add(writeCheckBox)
-                    .add(verifyCheckBox))
+                    .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                        .add(sequenceButton)
+                        .add(eraseCheckBox)
+                        .add(blankCheckBox)
+                        .add(writeCheckBox)
+                        .add(verifyCheckBox)))
                 .addContainerGap())
         );
 
@@ -661,7 +663,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
                 .addContainerGap()
                 .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 422, Short.MAX_VALUE))
+                .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 285, Short.MAX_VALUE))
         );
 
         pack();
