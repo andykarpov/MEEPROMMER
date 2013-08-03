@@ -402,9 +402,13 @@ inline byte read_byte(unsigned int address)
   //read data
   return read_data_bus();
 }
+
+//flag set if we are on the first write pass
+boolean firstWritePass = true;
  
 //short function to set up the programmer for writing
 void write_start() {
+  firstWritePass = true;
   //first disable output
   set_oe(HIGH);
   //disable write
@@ -436,9 +440,9 @@ inline boolean fast_write(unsigned int address, byte data)
   
       //only wait for write if the address page has changed since the last write
       //address page is 64 bytes, so xor the last address with the current one to
-      //look for a change
+      // look for a change.  Don't run on the first pass through.
       //28C64 does not support page writes so we poll every time
-      if ((lastAddress ^ address) & 0xFFC0 || chipType == CHIP28C64)
+      if (((lastAddress ^ address) & 0xFFC0 || chipType == CHIP28C64) && !firstWritePass)
       {
         unsigned long startTime = millis();
   
@@ -469,6 +473,7 @@ inline boolean fast_write(unsigned int address, byte data)
   
       lastAddress = address;
       lastData = data;
+      firstWritePass = false;
       break;
       
     case CHIP27SF512:
