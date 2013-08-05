@@ -390,7 +390,6 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Simple JBurn 2");
-        setAlwaysOnTop(true);
         setBounds(new java.awt.Rectangle(0, 0, 0, 0));
         setMinimumSize(new java.awt.Dimension(770, 450));
         setPreferredSize(new java.awt.Dimension(770, 600));
