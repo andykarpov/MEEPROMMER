@@ -20,7 +20,7 @@
 #define LEONARDO
 #endif
 
-#define VERSIONSTRING "MEEPROMMER $Revision: 1.4 $ $Date: July 31st, 2013 1:00pm $, CMD:B,b,w,W,V,C,E,P,p"
+#define VERSIONSTRING "MEEPROMMER $Revision: 1.4 $ $Date: July 31st, 2013 1:00pm $, CMD:R,r,w,W,V,C,E,P,p"
 
 // eeprom stuff
 // define the IO lines for the data - bus
