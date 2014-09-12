@@ -1,26 +1,15 @@
 /**
- * ** project Arduino EEPROM programmer **
+ * ** Arduino EEPROM programmer **
  *
  * This sketch can be used to read and write data to a
- * AT28C64, AT28C256, SST27SF512, W27E512 parallel EEPROM
- *
- * $Author: mario $
- * $Date: 2013/07/31 13:00:00 $
- * $Revision: 1.4 $
- *
- * This software is freeware and can be modified, reused or thrown away without any restrictions.
- *
- * Use this code at your own risk. I'm not responsible for any bad effect or damages caused by this software!!!
+ * AT28C16, AT28C64, AT28C256 parallel EEPROM
  *
  **/
 
-#if defined(__AVR_ATmega328P__)
-#define UNO
-#elif defined(__AVR_ATmega32U4__)
-#define LEONARDO
-#endif
+#define VERSIONSTRING "MEEPROMMER MOD, CMD:A,R,r,w,W,V,C,E,P,p"
 
-#define VERSIONSTRING "MEEPROMMER $Revision: 1.4 $ $Date: July 31st, 2013 1:00pm $, CMD:A,R,r,w,W,V,C,E,P,p"
+#define READ_DELAY 1 // uS
+#define WRITE_DELAY 15 // mS
 
 // eeprom stuff
 // define the IO lines for the data - bus
@@ -33,11 +22,6 @@
 #define D6 8
 #define D7 9
 
-// for high voltage programming supply 
-#define VH     10
-#define BOOST  11
-#define VPP    12
-
 // shiftOut part
 #define DS     A0
 #define LATCH  A1
@@ -48,24 +32,8 @@
 #define OE     A4
 #define WE     A5
 
-// direct access to port
-#if defined(UNO)
-#define STROBE_PORT PORTC
-#define STROBE_DS      0
-#define STROBE_LATCH   1
-#define STROBE_CLOCK   2
-#define STROBE_CE      3
-#define STROBE_OE      4
-#define STROBE_WE      5
-#elif defined(LEONARDO)
-#define STROBE_PORT PORTF
-#define STROBE_DS      7
-#define STROBE_LATCH   6
-#define STROBE_CLOCK   5
-#define STROBE_CE      4
-#define STROBE_OE      1
-#define STROBE_WE      0
-#endif
+#define LED_WRITE 13
+#define LED_READ 12
 
 //a buffer for bytes to burn
 #define BUFFERSIZE 1024
@@ -78,8 +46,11 @@ unsigned int startAddress,endAddress;
 unsigned int lineLength,dataLength;
 
 #define CHIP28C64 0
+#define CHIP28C128 1
 #define CHIP28C256 2
-#define CHIP27SF512 3
+#define CHIP28C512 3
+#define CHIP28C16 4
+#define CHIP28C32 5
 
 unsigned int chipType;
 
@@ -98,8 +69,6 @@ unsigned int chipType;
  
 #define CHIP_TYPE   30
 #define CHIP_ERASE  31
-#define VPP_ON      32
-#define VPP_OFF     33
 
 /****************************************************************
  *
@@ -135,16 +104,6 @@ void data_bus_output() {
 //be sure to set data_bus to input before
 byte read_data_bus()
 {
-  //access the port pins directly if possible, for speed
-  //the port pins do not match up with the data bits
-  //so we need to rearrange them
-#if defined(UNO)
-  return (PIND >> 2) | ((PINB & 0x3) << 6);
-#elif defined(LEONARDO)
-  return (PIND & 0x02) >> 1 | (PIND & 0x01) << 1 | (PIND & 0x10) >> 2 | (PINC & 0x40) >> 3 |
-         (PIND & 0x80) >> 3 | (PINE & 0x40) >> 1 | (PINB & 0x30) << 2;
-#else
-  //fallback to digitalRead
   return ((digitalRead(D7) << 7) |
     (digitalRead(D6) << 6) |
     (digitalRead(D5) << 5) |
@@ -153,29 +112,12 @@ byte read_data_bus()
     (digitalRead(D2) << 2) |
     (digitalRead(D1) << 1) |
     digitalRead(D0));
-#endif
 }
  
 //write a byte to the data bus
 //be sure to set data_bus to output before
 inline void write_data_bus(byte data)
 {
-  //access the ports directly if possible, for speed
-  //the ports do not match up with the data bits
-  //so we need to rearrange them
-#if defined(UNO)
-  //2 bits belong to PORTB and have to be set separtely
-  PORTB = (PORTB & 0xF8) | (data >> 6);
-  //bit 0 to 6 belong to bit 2 to 8 of PORTD
-  PORTD = data << 2;
-#elif defined(LEONARDO)
-  PORTB = (PORTB & 0x8F) | (data & 0xC0) >> 2;
-  PORTC = (PORTC & 0xBF) | (data & 0x08) << 3;
-  PORTD = (PORTD & 0x6C) | (data & 0x01) << 1 | (data & 0x02) >> 1 |
-          (data & 0x04) << 2 | (data & 0x10) << 3 | (data & 0x40) >> 3;
-  PORTE = (PORTE & 0xBF) | (data & 0x20) << 1;
-#else
-  //fallback to digitalWrite
   digitalWrite(D0, data & 1);
   digitalWrite(D1, data & 2);
   digitalWrite(D2, data & 4);
@@ -184,84 +126,17 @@ inline void write_data_bus(byte data)
   digitalWrite(D5, data & 32);
   digitalWrite(D6, data & 64);
   digitalWrite(D7, data & 128);
-#endif
 }
-
-
-//faster shiftOut function then normal IDE function
-//defined as macro so it can be 'unrolled' for more speed
-//set the port pins directly if possible
-#if (defined(UNO) || defined (LEONARDO))
-#define FAST_SHIFT(data) { \
-  /*shift out the top bit of the byte*/ \
-  if (data & 0x80) \
-    bitSet(STROBE_PORT,STROBE_DS); \
-  else \
-    bitClear(STROBE_PORT,STROBE_DS); \
-  /*shift data left so next bit is ready*/ \
-  data <<= 1; \
-  /*register shifts bits on upstroke of clock pin*/ \
-  bitSet(STROBE_PORT,STROBE_CLOCK); \
-  bitClear(STROBE_PORT,STROBE_CLOCK); \
-}
-#else
-//otherwise fallback to digitalWrite
-#define FAST_SHIFT(data) { \
-  /*shift out the top bit of the byte*/ \
-  if (data & 0x80) \
-    digitalWrite(DS, true); \
-  else \
-    digitalWrite(DS, false); \
-  /*shift data left so next bit is ready*/ \
-  data <<= 1; \
-  /*register shifts bits on upstroke of clock pin*/ \
-  digitalWrite(CLOCK, true); \
-  digitalWrite(CLOCK, false); \
-}
-#endif
 
 //shift out the given address to the 74hc595 registers
 inline void set_address_bus(unsigned int address)
 {
-  byte hi, low;
-
-  //get high - byte of 16 bit address
-  if (chipType == CHIP27SF512) {
-    //the 27x512 has different address pin wiring
-    //so we rearrange the bits here
-    hi = (address >> 8) & 0x3F;
-    hi |= (address >> 9) & 0x40;
-    //the 27x512 doesn't use WE, instead it's bit A14
-#if defined(UNO) || defined (LEONARDO)
-    if (address & 0x4000)
-        bitSet(STROBE_PORT, STROBE_WE);
-    else
-        bitClear(STROBE_PORT, STROBE_WE);
-#else
-    digitalWrite(WE, address & 0x4000 ? HIGH : LOW);
-#endif
-  } else {
-    hi = address >> 8;
-  }
-
-  //get low - byte of 16 bit address
-  low = address & 0xff;
-
-  //shift out highbyte using macro for speed
-  FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi);
-  FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi); FAST_SHIFT(hi);
-  //shift out lowbyte
-  FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low);
-  FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low); FAST_SHIFT(low);
-
-#if defined(UNO) || defined (LEONARDO)
-  //strobe latch line
-  bitSet(STROBE_PORT,STROBE_LATCH);
-  bitClear(STROBE_PORT,STROBE_LATCH);
-#else
-  digitalWrite(LATCH, true);
-  digitalWrite(LATCH, false);
-#endif
+  int addrlo = address & 0xFF;
+  int addrhi = (address >> 8) & 0xFF;
+  digitalWrite(LATCH, LOW);
+  shiftOut(DS, CLOCK, MSBFIRST, addrhi);
+  shiftOut(DS, CLOCK, MSBFIRST, addrlo);
+  digitalWrite(LATCH, HIGH);
 }
 
 //short function to set the OE(output enable line of the eeprom)
@@ -282,101 +157,12 @@ inline void set_ce (byte state)
 // attention, this line is LOW - active
 inline void set_we (byte state)
 {
-  //the 27x512 doesn't have a WE pin
-  switch (chipType) {
-    case CHIP27SF512:
-      break;
-    default:
-      digitalWrite(WE, state);
-    }
-}
-
-//short function to connect the boost voltage to the VPP(program) pin
-// attention, this line is HIGH - active
-void set_vpp (byte state)
-{
-  switch (chipType) {
-  case CHIP27SF512:
-    digitalWrite(VPP, state);
-    break;
-  default:
-    break;
-  }
-}
-
-//this function turns on the PWM by accessing the registers directly
-//value is from 0-255. 0 = minimum duty, 255 = maximum duty
-void pwm_on(byte value)
-{
-  //set PWM to 62 kHz
-  //attach timer to pin
-  //and write duty cycle
-#if defined(UNO)
-  //uses Arduino UNO pin 11, OC2A
-  TCCR2A = 0x83;
-  TCCR2B = 0x01;
-  OCR2A = value;
-#elif defined(LEONARDO)
-  //uses Arduino Leonardo pin 11, OC1C
-  TCCR1A = 0x09;
-  TCCR1B = 0x09;
-  OCR1C = value;
-#endif
-}
-
-//this function turns of the PWM altogether
-void pwm_off()
-{
-  //turn off timer
-#if defined(UNO)
-  TCCR2A = 0x01;
-#elif defined(LEONARDO)
-  TCCR1A = 0x01;
-#endif
-}
-
-//this controls the boost supply for programming
-//if state is true, the supply is turned on
-//it also sets the PWM to get the correct
-// programming voltage depending on the chipType
-void boost_supply (boolean state)
-{
-  //there is currently no support for anything other than UNO or Leonardo
-#if (defined(UNO) || defined(LEONARDO))
-  float duty;
-
-  if (!state) {
-    pwm_off();
-    return;
-  }
-
-  switch (chipType) {
-  case CHIP27SF512:
-    // VPP voltage of 13.2V
-    duty = 1 - (5 / (13.2 + 0.6));
-    pwm_on(duty * 255.0);
-    break;
-  default:
-    break;
-  }
-#endif
-}
-
-//short function to connect the boost voltage to the VH(erase) pin
-// attention, this line is HIGH - active
-void set_vh (byte state)
-{
-  switch (chipType) {
-  case CHIP27SF512:
-    digitalWrite(VH, state);
-    break;
-  default:
-    break;
-  }
+  digitalWrite(WE, state);
 }
 
 //short function to set up the programmer for reading
 void read_start() {
+  digitalWrite(LED_READ, HIGH);
   //set databus for reading
   data_bus_input();
   //enable chip select
@@ -393,6 +179,7 @@ void read_end() {
   set_oe(HIGH);
   //disable chip select
   set_ce(HIGH);
+  digitalWrite(LED_READ, LOW);
 }  
 
 //highlevel function to read a byte from a given address
@@ -400,6 +187,7 @@ inline byte read_byte(unsigned int address)
 {
   //set address bus
   set_address_bus(address);
+  delayMicroseconds(1);
   //read data
   return read_data_bus();
 }
@@ -409,6 +197,7 @@ boolean firstWritePass = true;
  
 //short function to set up the programmer for writing
 void write_start() {
+  digitalWrite(LED_WRITE, HIGH);
   firstWritePass = true;
   //first disable output
   set_oe(HIGH);
@@ -422,6 +211,7 @@ void write_start() {
 void write_end() {
   //set databus to input
   data_bus_input();
+  digitalWrite(LED_WRITE, LOW);
 }
 
 //highlevel function to write a byte to a given address
@@ -430,67 +220,45 @@ inline boolean fast_write(unsigned int address, byte data)
   static unsigned int lastAddress = 0;
   static byte lastData = 0;
   
-  switch (chipType) {
-    case CHIP28C64:
-    case CHIP28C256:
-      //this function uses /DATA polling to get the end of the
-      //page write cycle. This is much faster than waiting 10ms
+  //this function uses /DATA polling to get the end of the
+  //page write cycle. This is much faster than waiting 10ms
+
+  //enable chip select
+  set_ce(LOW);
   
-      //enable chip select
-      set_ce(LOW);
+  /*if (!firstWritePass) {
+    unsigned long startTime = millis();
+
+    //poll data until data matches
+    data_bus_input();
+    set_oe(LOW);
+
+    while(lastData != read_data_bus()) {
+      //set timeout here longer than JBurn timeout
+      if (millis() - startTime > 3000) return false;
+    }
+    
+    set_oe(HIGH);
+    delayMicroseconds(1);
+    data_bus_output();
+  }*/
   
-      //only wait for write if the address page has changed since the last write
-      //address page is 64 bytes, so xor the last address with the current one to
-      // look for a change.  Don't run on the first pass through.
-      //28C64 does not support page writes so we poll every time
-      if (((lastAddress ^ address) & 0xFFC0 || chipType == CHIP28C64) && !firstWritePass)
-      {
-        unsigned long startTime = millis();
-  
-        //poll data until data matches
-        data_bus_input();
-        set_oe(LOW);
-  
-        while(lastData != read_data_bus()) {
-          //set timeout here longer than JBurn timeout
-          if (millis() - startTime > 3000) return false;
-        }
-        
-        set_oe(HIGH);
-        delayMicroseconds(1);
-        data_bus_output();
-      }
-  
-      //set address and data for write
-      set_address_bus(address);
-      write_data_bus(data);
-      delayMicroseconds(1);
-   
-      //strobe write
-      set_we(LOW);
-      set_we(HIGH);
-      //disable chip select
-      set_ce(HIGH);
-  
-      lastAddress = address;
-      lastData = data;
-      firstWritePass = false;
-      break;
-      
-    case CHIP27SF512:
-      //set address and data for write
-      set_address_bus(address);
-      write_data_bus(data);
-      delayMicroseconds(1);
+  //set address and data for write
+  set_address_bus(address);
+  delayMicroseconds(1);
+  write_data_bus(data);
+  delayMicroseconds(1);
  
-      //strobe ce with programming pulse
-      set_ce(LOW);
-      //delayMicroseconds(20); // for 27SF512
-      delayMicroseconds(100); // for W27E512, works for 27SF512 also
-      set_ce(HIGH);
-      delayMicroseconds(1);
-      break;
-  }
+  //strobe write
+  set_we(LOW);
+  delay(WRITE_DELAY);
+  set_we(HIGH);
+  //disable chip select
+  set_ce(HIGH);
+
+  lastAddress = address;
+  lastData = data;
+  firstWritePass = false;
 
   return true;
 }
@@ -561,12 +329,6 @@ byte parseCommand() {
     break;
   case 'E':
     retval = CHIP_ERASE;
-    break;
-  case 'P':
-    retval = VPP_ON;
-    break;
-  case 'p':
-    retval = VPP_OFF;
     break;
   default:
     retval = NOCOMMAND;
@@ -694,72 +456,33 @@ void write_block(unsigned int address, byte* buffer, int len) {
  * erase entire chip
  **/
 void chip_erase() {
+  int last_address = 0;
   switch (chipType) {
+    case CHIP28C16:
+      last_address = 2048;
+    break;
+    case CHIP28C32:
+      last_address = 4096;
+    break;
     case CHIP28C64:
-      write_start();
-      for (unsigned int addr = 0; addr < 0x2000; addr++) {
-        if (fast_write(addr, 0xFF) == false)
-          break;
-      }
-      write_end();
-      break;
+      last_address = 8192;
+    break;
+    case CHIP28C128:
+      last_address = 16384;
+    break;
     case CHIP28C256:
-      //6 byte sequence to erase
-      //from Atmel "Software Chip Erase Application Note"
-      write_start();
-      set_address_bus(0x5555);
-      set_we(LOW);
-      write_data_bus(0xAA);
-      set_we(HIGH);
-      set_address_bus(0x2AAA);
-      set_we(LOW);
-      write_data_bus(0x55);
-      set_we(HIGH);
-      set_address_bus(0x5555);
-      set_we(LOW);
-      write_data_bus(0x80);
-      set_we(HIGH);
-      set_address_bus(0x5555);
-      set_we(LOW);
-      write_data_bus(0xAA);
-      set_we(HIGH);
-      set_address_bus(0x2AAA);
-      set_we(LOW);
-      write_data_bus(0x55);
-      set_we(HIGH);
-      set_address_bus(0x5555);
-      set_we(LOW);
-      write_data_bus(0x10);
-      set_we(HIGH);
-      write_end();
-      delay(20);
-      break;
-    case CHIP27SF512:
-      //27SF512 is erased by a 100+ms pulse on CE
-      //VH and VPP pins need the programming voltage
-      set_ce(HIGH);
-      set_oe(HIGH);
-      //the W27E512 needs the address and data bus
-      //a certain way for erase, 27SF512 doesn't care
-      set_address_bus(0x200);
-      write_data_bus(0xFF);
-      set_vh(HIGH);
-      set_vpp(HIGH);
-      boost_supply(true);
-      delay(1);
-      //erase pulse
-      set_ce(LOW);
-      delay(150);
-      set_ce(HIGH);
-      delayMicroseconds(1);
-      set_vh(LOW);
-      set_vpp(LOW);
-      boost_supply(false);
-      delayMicroseconds(1);
-      break;
-    default:
+      last_address = 32768;
+    break;
+    case CHIP28C512:
+      last_address = 65536;
+    break;
+  }
+  write_start();
+  for (unsigned int addr = 0; addr < last_address; addr++) {
+    if (fast_write(addr, 0xFF) == false)
       break;
   }
+  write_end();
 }
  
 /**
@@ -799,15 +522,6 @@ void setup() {
   pinMode(LATCH, OUTPUT);
   pinMode(CLOCK, OUTPUT);
  
-  //define the boost pins as output
-  // take care that they are LOW
-  digitalWrite(BOOST, LOW);
-  pinMode(BOOST, OUTPUT);
-  digitalWrite(VH, LOW);
-  pinMode(VH, OUTPUT);
-  digitalWrite(VPP, LOW);
-  pinMode(VPP, OUTPUT);
-
   //define the EEPROM Pins as output
   // take care that they are HIGH
   digitalWrite(OE, HIGH);
@@ -816,11 +530,15 @@ void setup() {
   pinMode(CE, OUTPUT);
   digitalWrite(WE, HIGH);
   pinMode(WE, OUTPUT);
-
+  
+  pinMode(LED_WRITE, OUTPUT);
+  pinMode(LED_READ, OUTPUT);
+  
   //set speed of serial connection
   //on Leonardo this is noop
-//  Serial.begin(115200);
-  Serial.begin(460800);
+  Serial.begin(115200);
+//  Serial.begin(460800);
+//Serial.begin(9600);
 }
  
 /**
@@ -877,16 +595,6 @@ void loop() {
   case CHIP_ERASE:
     chip_erase();
     Serial.println('%');
-    break;
-  case VPP_ON:
-    set_vpp(HIGH);
-    boost_supply(true);
-    delay(1);
-    break;
-  case VPP_OFF:
-    set_vpp(LOW);
-    boost_supply(false);
-    delayMicroseconds(1);
     break;
   default:
     break;    

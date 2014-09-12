@@ -40,7 +40,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
     static private final String date = "$Date: 2013/07/31 13:00:00 $";
     //used to end a line in the output window
     static private final String newline = "\n";
-    private static final String[] EEPROMTYPES = {"28C64  (8KiB) ", "28C128 (16KiB)", "28C256 (32KiB)", "27SF512 (64KiB)"};
+    private static final String[] EEPROMTYPES = {"28C64  (8KiB) ", "28C128 (16KiB)", "28C256 (32KiB)", "27SF512 (64KiB)", "27C16 (2KiB)"};
     private static final String[] OFFSETS = {"-----", " 2KiB", " 4KiB", " 8KiB", "16KiB", "24KiB", "32KiB", "48KiB"};
     private ReadTask readTask;
     private WriteTask writeTask;
@@ -97,12 +97,14 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
                 appendToLog("trying to read." + newline);
                 int counter = 0, c;
                 do {
-                    c = mySerial.in.read();
-                    if (c == -1) throw new Exception("Communication timeout");
-                    eeprom[counter++] = (byte) c;
-                    if (counter % 100 == 0) {
-                        readProgress = 100 * counter / maxAddress;
-                        setProgress(readProgress);
+                    if (mySerial.in.available()>0) {
+                        c = mySerial.in.read();
+                        if (c == -1) throw new Exception("Communication timeout");
+                        eeprom[counter++] = (byte) c;
+                        if (counter % 100 == 0) {
+                            readProgress = 100 * counter / maxAddress;
+                            setProgress(readProgress);
+                        }
                     }
                 } while (counter < maxAddress);
                 end = System.currentTimeMillis();
@@ -215,9 +217,12 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
                     mySerial.out.write(data, i, 1024);
                     appendToLog("wrote data from 0x" + Utility.wordToHex(address + i)
                             + " to 0x" + Utility.wordToHex(address + i + 1023) + newline);
+                    c = 0;
                     do {
-                        c = mySerial.in.read();
-                        if (c == -1) throw new Exception("Communication timeout");
+                        if (mySerial.in.available() > 0) {
+                          c = mySerial.in.read();
+                          if (c == -1) throw new Exception("Communication timeout");
+                        }
                     } while (c != '%');
 
                 }
@@ -763,6 +768,10 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
             maxAddress = 65536;
             chipType = 3;
             break;
+            case 4:
+            maxAddress = 2048;
+            chipType = 5;
+            break;
             default:
             maxAddress = 8192;
             chipType = 0;
@@ -792,13 +801,16 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
                 mySerial.out.write('\n');
                 String line = "";
                 int c;
+                c = 0;
                 do {
-                    c = mySerial.in.read();
-                    if (c == -1) throw new Exception("Communication timeout");
-                    line = line + (char) c;
-                    if (c == '\n') {
-                        appendToLog( line);
-                        line = "";
+                    if (mySerial.in.available()>0) {
+                        c = mySerial.in.read();
+                        if (c == -1) throw new Exception("Communication timeout");
+                        line = line + (char) c;
+                        if (c == '\n') {
+                            appendToLog( line);
+                            line = "";
+                        }
                     }
                 } while (c != '\n');
             } catch (Exception e) {
@@ -857,11 +869,14 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         appendToLog("Erasing EEPROM." + newline);
         try {
             int c;
+            c=0;
             mySerial.out.write('E');
             mySerial.out.write('\n');
             do {
-                c = mySerial.in.read();
-                if (c == -1) throw new Exception("Communication timeout");
+                if (mySerial.in.available() > 0) {
+                  c = mySerial.in.read();
+                  if (c == -1) throw new Exception("Communication timeout");
+                }
             } while (c != '%');
 
             failure = false;
@@ -894,7 +909,7 @@ public class MainFrame extends javax.swing.JFrame implements PropertyChangeListe
         selectedComPort = (String) serialSelect.getSelectedItem();
         try {
             mySerial.disconnect();
-            mySerial.connect(selectedComPort, 460800);
+            mySerial.connect(selectedComPort, 115200);
             appendToLog(selectedComPort + " is now connected." + newline);
 
             // Wait for Arduino to connect
