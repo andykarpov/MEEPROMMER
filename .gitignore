@@ -6,7 +6,7 @@ SimpleJBurn/build/
 # Compiled source #
 ###################
 *.com
-*.class
+#*.class
 *.dll
 *.exe
 *.o
@@ -20,10 +20,10 @@ SimpleJBurn/build/
 *.dmg
 *.gz
 *.iso
-*.jar
+#*.jar
 *.rar
 *.tar
-*.zip
+#*.zip
 
 # Logs and databases #
 ######################
